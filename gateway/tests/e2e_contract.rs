@@ -105,8 +105,10 @@ async fn mock_infer(
     }
     let blob = &body[hcl..hcl + (n * seq * 8) as usize];
     let values: Vec<i64> = blob
-        .chunks_exact(8)
-        .map(|c| i64::from_le_bytes(c.try_into().unwrap()))
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .map(|c| i64::from_le_bytes(*c))
         .collect();
     let mut out = Vec::new();
     for row in values.chunks_exact(seq as usize) {
