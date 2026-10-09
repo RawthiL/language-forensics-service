@@ -1,0 +1,61 @@
+# Triton (any backend's ONNX) behind the model-agnostic Rust gateway.
+#
+#   (generate models first, from the repo root:
+#      uv run --extra onnx python tools/make_fixtures.py                        # smoke fixture
+#    or with real weights:
+#      uv run --extra horizon-guard python backends/horizon_guard/export.py --variant base)
+#   cp config.example.yaml config.yaml   # then edit keys/default_model
+#   cd docker && docker compose up --build
+#
+# Clients then hit  http://localhost:8080/v1/detect  (see docs/openapi.json).
+# Triton's own ports stay internal (gateway network only) — the gateway is the
+# single authenticated entrypoint.
+#
+# Both containers mount the SAME model repository: Triton loads 1/model.onnx,
+# the gateway reads tokenizer.json next to config.pbtxt.
+
+services:
+  triton:
+    # When bumping, also bump TRITON_PROTO_REF in tools/verify_repo.py (r26.03).
+    image: nvcr.io/nvidia/tritonserver:26.03-py3
+    command: tritonserver --model-repository=/models
+    volumes:
+      - ../triton/model_repository:/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/v2/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+    # GPU (onnxruntime-gpu is built into this image). Requires
+    # nvidia-container-toolkit on the daemon; comment out for CPU-only runs.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['2']
+              capabilities: [gpu]
+
+  gateway:
+    # `docker compose up --build` builds it locally instead; to use a release:
+    #   GATEWAY_TAG=0.2.0 docker compose pull gateway && docker compose up -d --no-build
+    image: ghcr.io/rawthil/language-forensics-service:${GATEWAY_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+      args:
+        FEATURES: "${GATEWAY_FEATURES:-horizon-guard prompt-guard}"   # backends compiled in
+    depends_on:
+      triton:
+        condition: service_healthy
+    environment:
+      # Override triton.url / model_repository from config.yaml (which may
+      # point at a local dev mock and ./triton).
+      TRITON_URL: "http://triton:8000"
+      MODEL_REPOSITORY: "/models"
+    volumes:
+      - ../config.yaml:/app/config.yaml:ro
+      - ../triton/model_repository:/models:ro
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    restart: unless-stopped

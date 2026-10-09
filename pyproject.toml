@@ -1,0 +1,46 @@
+[project]
+name = "language-forensics-service"
+version = "0.1.0"
+description = "Tooling for a model-agnostic prompt-injection /v1/detect gateway (Rust) in front of Triton."
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+# Per-backend export tooling. One extra per backends/<family>.
+# horizon-guard ships ONNX weights upstream, so no torch is needed.
+horizon-guard = ["huggingface_hub>=0.30", "onnx>=1.16", "tokenizers>=0.21"]
+# prompt-guard ships PyTorch weights only: tracing to ONNX needs torch.
+# Weights: Llama 4 Community License — see backends/prompt_guard/README.md.
+prompt-guard = [
+    "huggingface_hub>=0.30", "onnx>=1.16", "onnxruntime>=1.18", "tokenizers>=0.21",
+    "torch>=2.2", "transformers>=4.44", "safetensors>=0.4",
+]
+# ONNX-only helpers (fixture generation, mock Triton) — no torch, no weights.
+onnx = ["onnx>=1.16", "onnxruntime>=1.18", "tokenizers>=0.21"]
+test = ["pytest>=8.0", "onnx>=1.16", "onnxruntime>=1.18", "tokenizers>=0.21"]
+
+[tool.uv]
+package = false
+# onnxruntime stopped publishing Intel-macOS wheels after 1.23.
+# PyTorch stopped publishing Intel-macOS wheels after 2.2.2 (cp311/cp312
+# only), so the resolver lands there on its own; torch 2.2.2 predates NumPy 2
+# and segfaults against it. Same policy as image-forensics-service.
+constraint-dependencies = [
+    "onnxruntime<1.24; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "numpy<2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    # transformers 5 needs a newer torch and silently ignores 2.2.
+    "transformers<5; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
+# Intel macOS is a dev target, so the lock must carry wheels that run there.
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'x86_64' and python_version < '3.13'",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

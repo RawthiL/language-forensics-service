@@ -1,0 +1,13 @@
+[package]
+name = "backend-horizon-guard"
+description = "Horizon-Labs prompt-injection-guard backend."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+backend-api.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

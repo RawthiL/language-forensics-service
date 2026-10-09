@@ -1,0 +1,25 @@
+# Workspace layout (see README "Architecture"):
+#   gateway/        model-agnostic /v1/detect HTTP interface (binary)
+#   backend-api/    the contract every model backend implements
+#   backends/<x>/   one self-contained folder per model family
+[workspace]
+resolver = "3"
+members = ["gateway", "backend-api", "backends/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+
+[workspace.dependencies]
+backend-api = { path = "backend-api" }
+backend-horizon-guard = { path = "backends/horizon_guard" }
+backend-prompt-guard = { path = "backends/prompt_guard" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+thiserror = "2.0.21"
+# `onig` matches the regex engine of the Python `tokenizers` package that
+# wrote the tokenizer.json files; fancy-regex differs on some patterns.
+tokenizers = { version = "0.23.2", default-features = false, features = ["onig"] }

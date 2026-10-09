@@ -1,0 +1,33 @@
+[package]
+name = "gateway"
+description = "Prompt-injection detection gateway (/v1/detect + Lakera/Azure layers) in front of Triton; model-agnostic."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+# Each model backend is an optional, self-contained crate under backends/.
+# Build a gateway with only the families you intend to serve, e.g.
+#   cargo build --release -p gateway --no-default-features --features horizon-guard
+[features]
+default = ["horizon-guard", "prompt-guard"]
+horizon-guard = ["dep:backend-horizon-guard"]
+# prompt-guard: weights are under the Llama 4 Community License (see backends/prompt_guard/README.md)
+prompt-guard = ["dep:backend-prompt-guard"]
+
+[dependencies]
+backend-api.workspace = true
+backend-horizon-guard = { workspace = true, optional = true }
+backend-prompt-guard = { workspace = true, optional = true }
+axum = "0.8.9"
+futures-util = "0.3.34"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml = "0.9.34"
+subtle = "2.6.1"
+thiserror.workspace = true
+tokio = { version = "1.53.2", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+uuid = { version = "1.27.0", features = ["v4"] }

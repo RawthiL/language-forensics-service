@@ -1,0 +1,65 @@
+# language-forensics-service — gateway configuration
+# Copy to config.yaml and edit. All values below are the defaults unless noted.
+
+server:
+  listen: "0.0.0.0:8080"        # gateway binds here; clients POST /v1/detect
+
+triton:
+  url: "http://127.0.0.1:8000"  # Triton HTTP endpoint (env TRITON_URL overrides;
+                                # docker compose sets it to http://triton:8000)
+  timeout_ms: 30000
+  # Optional Bearer key if Triton sits behind an auth proxy. Leave unset when
+  # Triton is network-internal.
+  # api_key: "shared-secret"
+  # Optional: Triton model name if it differs from default_model.
+  # triton_model_name: "horizon-guard-base"
+
+# The gateway's read-only view of the SAME model repository Triton serves.
+# Each model's tokenizer.json lives next to its config.pbtxt; the gateway
+# reads it from here and refuses to start if its sha256 differs from the one
+# the exporter recorded. (env MODEL_REPOSITORY overrides; docker compose
+# mounts the repository at /models in both containers.)
+model_repository: "triton/model_repository"
+
+# The single public model this deployment serves (a Triton model name). Any
+# model exported by a backends/<family>/export.py works: the gateway reads the
+# model's metadata from Triton at startup and selects the matching backend,
+# so every request and response shape is identical regardless of model.
+# Check the model's license before serving it commercially (see README).
+default_model: "horizon-guard-base"   # e.g. horizon-guard-base-q8, horizon-guard-large
+
+# Flat list of accepted API keys (one per client). A request is authorized if
+# its key constant-time matches any entry. The key is read from
+# `Authorization: Bearer <key>`, `X-API-Key`, or `Ocp-Apim-Subscription-Key`
+# (so Lakera and Azure SDK clients only swap their key and endpoint).
+# Omit the field (or leave the list empty) to disable authentication: every
+# route is then open and startup logs a warning. An empty-string key is an
+# error, not "no auth".
+api_keys:
+  - "change-me-client-a"
+  # - "change-me-client-b"
+
+limits:
+  max_body_kb: 1024             # request body cap
+  max_inputs: 32                # texts per request (inputs / messages / documents)
+  max_chars: 100000             # code points per request, all texts together
+  # Windows per request. Over the limit is a 413, never a silent truncation:
+  # an unscanned tail is exactly where an injection would hide.
+  max_windows: 64
+  max_concurrent_batches: 4     # Triton requests in flight per client request
+
+scoring:
+  # Window policy, in tokens (special tokens included). Unset = the exporter's
+  # recommendation (horizon-guard: 2048 / 512, upstream's evaluation setting).
+  # It is part of the pipeline fingerprint: changing it changes scores.
+  # window_tokens: 2048
+  # stride_tokens: 512          # default: window_tokens / 4 when overridden
+  # Score at or above which a text is flagged. Native /v1/detect requests may
+  # override it per request; the Lakera and Azure layers always use this.
+  # 0.5 is the model's own decision boundary, NOT a calibrated operating point
+  # (see README "Detection quality").
+  threshold: 0.5
+
+api:
+  lakera: true                  # POST /v2/guard
+  azure: true                   # POST /contentsafety/text:shieldPrompt

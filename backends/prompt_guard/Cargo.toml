@@ -1,0 +1,13 @@
+[package]
+name = "backend-prompt-guard"
+description = "Meta Llama Prompt Guard 2 backend."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+backend-api.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
